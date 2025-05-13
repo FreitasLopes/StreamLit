@@ -13,7 +13,12 @@ def load_data():
     df = pd.read_excel("correlacaoIPCA.xlsx")
     df['Date'] = pd.to_datetime(df['Date'])
     df['Ano'] = df['Date'].dt.year
-    df['Mês'] = df['Date'].dt.month_name(locale='pt_BR')
+    meses = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    df['Mês'] = df['Date'].dt.month.map(meses)
     return df
 
 df = load_data()
@@ -24,7 +29,7 @@ ano_min, ano_max = st.slider(
     "Selecione o período:",
     min_value=2004,
     max_value=2025,
-    value=(2020, 2025)  # Parêntese corrigido
+    value=(2020, 2025)
 )
 
 indicador = st.radio(
@@ -133,17 +138,17 @@ if not df_filtrado.empty:
     st.subheader("💡 O Que Fazer?")
     if indicador == "IPCA":
         st.markdown("""
-        - **Acima de 0.5%:** Reajuste preços a cada 2 meses
+        - **Acima de 0.5%:** Reajuste preços a cada 2 meses  
         - **Abaixo de 0.3%:** Mantenha margens competitivas
         """)
     elif indicador == "SELIC":
         st.markdown("""
-        - **Acima de 1%:** Evite novos empréstimos
+        - **Acima de 1%:** Evite novos empréstimos  
         - **Abaixo de 0.8%:** Considere financiar equipamentos
         """)
     else:
         st.markdown("""
-        - **Acima de 2%:** Exija entrada de 30%
+        - **Acima de 2%:** Exija entrada de 30%  
         - **Abaixo de 1.5%:** Ofereça condições especiais
         """)
 
