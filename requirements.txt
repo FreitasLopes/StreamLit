@@ -5,4 +5,3 @@ openpyxl
 datetime
 statsmodels
 requests
-sys
