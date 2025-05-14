@@ -1,17 +1,37 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import requests
 from datetime import datetime
+import plotly.express as px
+import os
+import sys
+import plotly.graph_objects as go
 
-# Configurações
+# titulo de incio
 st.set_page_config(page_title="Análise MEI", layout="wide", page_icon="📊")
-st.title("📈 Painel Econômico Simplificado para MEI")
+st.title("📈 Painel Econômico para MEI")
 
-# Carregar dados
-@st.cache_data
+# Função para baixar séries do Bacen
+def baixar_serie_bacen(codigo_serie, nome_serie):
+    url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_serie}/dados?formato=json'
+    resposta = requests.get(url)
+    dados = resposta.json()
+    df = pd.DataFrame(dados)
+    df['data'] = pd.to_datetime(df['data'], dayfirst=True)
+    df['valor'] = pd.to_numeric(df['valor'].str.replace(',', '.'), errors='coerce')
+    df = df.rename(columns={'data': 'Date', 'valor': nome_serie})
+    return df
+
+# Cache de 1 hora
+#@st.cache_data(ttl=3600)
 def load_data():
-    df = pd.read_excel("correlacaoIPCA.xlsx")
-    df['Date'] = pd.to_datetime(df['Date'])
+    selic_df = baixar_serie_bacen(4390, 'SELIC')
+    ipca_df = baixar_serie_bacen(433, 'IPCA')
+    inad_df = baixar_serie_bacen(15885, 'Inadimplencia')
+    
+    df = selic_df.merge(ipca_df, on='Date', how='inner')
+    df = df.merge(inad_df, on='Date', how='inner')
+    df = df.dropna()
     df['Ano'] = df['Date'].dt.year
     meses = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
@@ -20,10 +40,22 @@ def load_data():
     }
     df['Mês'] = df['Date'].dt.month.map(meses)
     return df
+def clean_file(df, relatorio = 'relatorio.xlsx'):
+    if os.path.exists(relatorio):
+        os.remove(relatorio)
+    df.to_excel(relatorio, index=False)
 
+# Botão para atualizar e salvar Excel
+if st.button("🔄 Atualizar dados agora"):
+    df_atualizado = load_data()
+    df_atualizado.to_excel("relatorio.xlsx", index=False)
+    clean_file(df_atualizado)
+    st.success("Dados atualizados com sucesso!")
+
+# Carrega os dados
 df = load_data()
 
-# Filtros Superiores
+# Filtros
 st.subheader("🔍 Filtros")
 ano_min, ano_max = st.slider(
     "Selecione o período:",
@@ -35,12 +67,12 @@ ano_min, ano_max = st.slider(
 indicador = st.radio(
     "Indicador principal:",
     ["IPCA", "SELIC", "Inadimplencia"],
-    horizontal=True)
+    horizontal=True
+)
 
-# Filtrar dados
 df_filtrado = df[(df['Ano'] >= ano_min) & (df['Ano'] <= ano_max)]
 
-# Layout Principal
+# Layout principal
 col1, col2 = st.columns([3, 1])
 
 with col1:
@@ -66,14 +98,12 @@ with col1:
 with col2:
     if not df_filtrado.empty:
         ultimo_valor = df_filtrado[indicador].iloc[-1]
-        variacao = (df_filtrado[indicador].iloc[-1] - df_filtrado[indicador].iloc[0]) / df_filtrado[indicador].iloc[0] * 100
-        
+        variacao = (ultimo_valor - df_filtrado[indicador].iloc[0]) / df_filtrado[indicador].iloc[0] * 100
         st.metric(
             label="Valor Atual",
             value=f"{ultimo_valor:.2f}%",
             delta=f"{variacao:.1f}% (variação total)"
         )
-        
         st.markdown("### 📉 Nível de Atenção")
         if (indicador == "IPCA" and ultimo_valor > 0.7) or \
            (indicador == "SELIC" and ultimo_valor > 1.0) or \
@@ -104,23 +134,37 @@ if not df_filtrado.empty:
             st.error(f"Erro ao gerar gráfico: {str(e)}")
 
     with tab2:
-        pivot = df_filtrado.pivot_table(
-            index="Mês",
-            columns="Ano",
-            values=indicador,
-            aggfunc="mean"
+        radar_df = df_filtrado.groupby("Mês")[indicador].mean().reset_index()
+        radar_df['Mês'] = pd.Categorical(radar_df['Mês'], categories=[
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ], ordered=True)
+        radar_df = radar_df.sort_values("Mês")
+
+       
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+    r=radar_df[indicador],
+    theta=radar_df["Mês"],
+    fill='toself',
+    name=indicador,
+    line_color='blue',
+    hovertemplate='%{theta}<br>%{r:.2f}%<extra></extra>'
+))
+
+
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, radar_df[indicador].max() * 1.1])
+            ),
+            showlegend=False,
+            title="Padrão Mensal (Radar Chart)"
         )
-        meses_ordem = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-        pivot = pivot.reindex(meses_ordem)
-        
-        fig = px.imshow(
-            pivot,
-            labels=dict(x="Ano", y="Mês", color=indicador),
-            title="Padrão Mensal",
-            color_continuous_scale="Blues"
-        )
+
         st.plotly_chart(fig, use_container_width=True)
+
+
 
     with tab3:
         fig = px.bar(
@@ -153,3 +197,5 @@ if not df_filtrado.empty:
         """)
 
 st.caption("Fonte: Banco Central e IBGE | Dados atualizados em " + datetime.now().strftime("%d/%m/%Y"))
+
+
