@@ -1,17 +1,15 @@
+# ─────── IMPORTAÇÕES E CONFIGURAÇÕES ───────
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
 import plotly.express as px
-import os
-import sys
 import plotly.graph_objects as go
+from datetime import datetime
+import os
 
-# titulo de incio
-st.set_page_config(page_title="Análise MEI", layout="wide", page_icon="📊")
-st.title("📈 Painel Econômico para MEI")
+st.set_page_config(page_title="Painel MEI", layout="wide", page_icon="📊")
 
-# Função para baixar séries do Bacen
+# ─────── FUNÇÕES AUXILIARES ───────
 def baixar_serie_bacen(codigo_serie, nome_serie):
     url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_serie}/dados?formato=json'
     resposta = requests.get(url)
@@ -22,16 +20,11 @@ def baixar_serie_bacen(codigo_serie, nome_serie):
     df = df.rename(columns={'data': 'Date', 'valor': nome_serie})
     return df
 
-# Cache de 1 hora
-#@st.cache_data(ttl=3600)
 def load_data():
     selic_df = baixar_serie_bacen(4390, 'SELIC')
     ipca_df = baixar_serie_bacen(433, 'IPCA')
     inad_df = baixar_serie_bacen(15885, 'Inadimplencia')
-    
-    df = selic_df.merge(ipca_df, on='Date', how='inner')
-    df = df.merge(inad_df, on='Date', how='inner')
-    df = df.dropna()
+    df = selic_df.merge(ipca_df, on='Date').merge(inad_df, on='Date').dropna()
     df['Ano'] = df['Date'].dt.year
     meses = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
@@ -40,162 +33,121 @@ def load_data():
     }
     df['Mês'] = df['Date'].dt.month.map(meses)
     return df
-def clean_file(df, relatorio = 'relatorio.xlsx'):
+
+def save_excel(df):
+    relatorio = 'relatorio_mei.xlsx'
     if os.path.exists(relatorio):
         os.remove(relatorio)
     df.to_excel(relatorio, index=False)
 
-# Botão para atualizar e salvar Excel
-if st.button("🔄 Atualizar dados agora"):
-    df_atualizado = load_data()
-    df_atualizado.to_excel("relatorio.xlsx", index=False)
-    clean_file(df_atualizado)
-    st.success("Dados atualizados com sucesso!")
+# ─────── INTERFACE PRINCIPAL ───────
+pagina = st.sidebar.radio("Menu", options=["Home", "Contabilidade"])
 
-# Carrega os dados
-df = load_data()
+if pagina == "Home":
+    st.title("📈 Painel Econômico Interativo para MEI")
 
-# Filtros
-st.subheader("🔍 Filtros")
-ano_min, ano_max = st.slider(
-    "Selecione o período:",
-    min_value=2004,
-    max_value=2025,
-    value=(2020, 2025)
-)
-
-indicador = st.radio(
-    "Indicador principal:",
-    ["IPCA", "SELIC", "Inadimplencia"],
-    horizontal=True
-)
-
-df_filtrado = df[(df['Ano'] >= ano_min) & (df['Ano'] <= ano_max)]
-
-# Layout principal
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    if not df_filtrado.empty:
-        fig = px.area(
-            df_filtrado,
-            x="Date",
-            y=indicador,
-            title=f"Comportamento do {indicador} ({ano_min}-{ano_max})",
-            labels={"Date": "", indicador: "Valor (%)"},
-            color_discrete_sequence=["#4B9AC7"]
-        )
-        fig.update_layout(
-            hovermode="x",
-            plot_bgcolor="white",
-            showlegend=False,
-            height=400
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    if st.button("🔄 Atualizar relatório agora"):
+        df = load_data()
+        save_excel(df)
+        st.success("Relatório atualizado com sucesso!")
     else:
-        st.warning("Nenhum dado disponível para o período selecionado")
+        df = load_data()
 
-with col2:
-    if not df_filtrado.empty:
-        ultimo_valor = df_filtrado[indicador].iloc[-1]
-        variacao = (ultimo_valor - df_filtrado[indicador].iloc[0]) / df_filtrado[indicador].iloc[0] * 100
-        st.metric(
-            label="Valor Atual",
-            value=f"{ultimo_valor:.2f}%",
-            delta=f"{variacao:.1f}% (variação total)"
-        )
-        st.markdown("### 📉 Nível de Atenção")
-        if (indicador == "IPCA" and ultimo_valor > 0.7) or \
-           (indicador == "SELIC" and ultimo_valor > 1.0) or \
-           (indicador == "Inadimplencia" and ultimo_valor > 2.0):
-            st.error("Alerta - Condição crítica para seu negócio!")
-        else:
-            st.success("Situação estável")
-    else:
-        st.warning("Selecione um período válido")
+    ano_min, ano_max = st.slider("Selecione o período:", 2004, 2025, (2020, 2025))
+    df = df[(df['Ano'] >= ano_min) & (df['Ano'] <= ano_max)]
 
-# Gráficos Complementares
-if not df_filtrado.empty:
-    st.subheader("📌 Entenda as Relações")
-    tab1, tab2, tab3 = st.tabs(["IPCA vs Inadimplência", "Sazonalidade", "Comparação Anual"])
+    indicadores_disponiveis = ["SELIC", "IPCA", "Inadimplencia"]
+    indicadores_selecionados = st.multiselect("Escolha os indicadores:", indicadores_disponiveis, default=indicadores_disponiveis)
 
-    with tab1:
-        try:
-            fig = px.scatter(
-                df_filtrado,
-                x="IPCA",
-                y="Inadimplencia",
-                trendline="lowess",
-                title="Como a Inflação Afeta a Inadimplência",
-                color_discrete_sequence=["#FF6B6B"]
-            )
+    abas = st.tabs(["📊 Evolução", "📉 Comparação Anual", "📌 Correlação", "📆 Sazonalidade", "📊 Barras Combinadas", "🔮 Projeções Futuras"])
+
+    with abas[0]:
+        with st.expander("ℹ️ Sobre este gráfico"):
+            st.markdown("""💡 **Como interpretar?**
+            - SELIC: Se acima de 10%, crédito é caro. Ideal para MEI: evite empréstimos.
+            - IPCA: Acima de 5%? Reajuste preços mensalmente.
+            - Inadimplência: Acima de 5%? Ofereça descontos para pagamento à vista.
+
+            🔍 **Dica para MEI:** 
+            Monitore meses em que a SELIC e o IPCA sobem juntos. São períodos críticos para ajustar estratégias de preço e estoque.""")
+        for indicador in indicadores_selecionados:
+            fig = px.line(df, x="Date", y=indicador, title=f"Evolução de {indicador}")
             st.plotly_chart(fig, use_container_width=True)
-        except Exception as e:
-            st.error(f"Erro ao gerar gráfico: {str(e)}")
 
-    with tab2:
-        radar_df = df_filtrado.groupby("Mês")[indicador].mean().reset_index()
-        radar_df['Mês'] = pd.Categorical(radar_df['Mês'], categories=[
-            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-        ], ordered=True)
-        radar_df = radar_df.sort_values("Mês")
+    with abas[1]:
+        with st.expander("ℹ️ Sobre este gráfico"):
+            st.markdown("""💡 **O que analisar?**
+            - Anos com IPCA alto: Custos operacionais aumentaram.
+            - SELIC baixa: Boa hora para investir.
+            - Inadimplência em alta: Exija entradas maiores.""")
+        for indicador in indicadores_selecionados:
+            media_anual = df.groupby("Ano")[indicador].mean().reset_index()
+            fig = px.bar(media_anual, x="Ano", y=indicador, title=f"Média Anual de {indicador}")
+            st.plotly_chart(fig, use_container_width=True)
 
-       
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(
-    r=radar_df[indicador],
-    theta=radar_df["Mês"],
-    fill='toself',
-    name=indicador,
-    line_color='blue',
-    hovertemplate='%{theta}<br>%{r:.2f}%<extra></extra>'
-))
-
-
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, radar_df[indicador].max() * 1.1])
-            ),
-            showlegend=False,
-            title="Padrão Mensal (Radar Chart)"
-        )
-
+    with abas[2]:
+        with st.expander("ℹ️ Sobre este gráfico"):
+            st.markdown("Mostra a relação entre dois indicadores. Correlações ajudam o MEI a entender como um indicador pode influenciar o outro.")
+        col1, col2 = st.columns(2)
+        with col1:
+            x_axis = st.selectbox("Eixo X", indicadores_disponiveis)
+        with col2:
+            y_axis = st.selectbox("Eixo Y", [i for i in indicadores_disponiveis if i != x_axis])
+        fig = px.scatter(df, x=x_axis, y=y_axis, trendline="ols", title=f"Correlação entre {x_axis} e {y_axis}")
         st.plotly_chart(fig, use_container_width=True)
 
+        correlacao = df[x_axis].corr(df[y_axis])
+        st.markdown(f"📌 **Coeficiente de correlação**: `{correlacao:.2f}`")
+        if correlacao > 0.7:
+            nivel = "forte"
+        elif correlacao > 0.4:
+            nivel = "moderada"
+        elif correlacao > 0.2:
+            nivel = "fraca"
+        else:
+            nivel = "muito fraca"
+        direcao = "direta" if correlacao > 0 else "inversa"
+        st.info(f"A correlação entre {x_axis} e {y_axis} é **{nivel}** e **{direcao}**.")
 
+    with abas[3]:
+        with st.expander("ℹ️ Sobre este gráfico"):
+            st.markdown("Comportamento médio mensal. Útil para planejamento de sazonalidade.")
+        for indicador in indicadores_selecionados:
+            sazonalidade = df.groupby("Mês")[indicador].mean().reindex([
+                'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+            ])
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(r=sazonalidade.values, theta=sazonalidade.index, fill='toself', name=indicador))
+            fig.update_layout(title=f"Sazonalidade de {indicador}", polar=dict(radialaxis=dict(visible=True)))
+            st.plotly_chart(fig, use_container_width=True)
 
-    with tab3:
-        fig = px.bar(
-            df_filtrado.groupby("Ano")[indicador].mean().reset_index(),
-            x="Ano",
-            y=indicador,
-            title="Média Anual Comparativa",
-            color=indicador,
-            color_continuous_scale="Tealrose"
-        )
+    with abas[4]:
+        with st.expander("ℹ️ Sobre este gráfico"):
+            st.markdown("Visualize todos os indicadores juntos mês a mês.")
+        df_barra = df[['Date'] + indicadores_disponiveis].copy()
+        df_barra['AnoMes'] = df_barra['Date'].dt.to_period('M').astype(str)
+        df_melt = df_barra.melt(id_vars="AnoMes", value_vars=indicadores_disponiveis, var_name="Indicador", value_name="Valor")
+        fig = px.bar(df_melt, x="AnoMes", y="Valor", color="Indicador", title="Indicadores Combinados por Mês")
         st.plotly_chart(fig, use_container_width=True)
 
-# Dicas Contextuais
-if not df_filtrado.empty:
-    st.subheader("💡 O Que Fazer?")
-    if indicador == "IPCA":
-        st.markdown("""
-        - **Acima de 0.5%:** Reajuste preços a cada 2 meses  
-        - **Abaixo de 0.3%:** Mantenha margens competitivas
-        """)
-    elif indicador == "SELIC":
-        st.markdown("""
-        - **Acima de 1%:** Evite novos empréstimos  
-        - **Abaixo de 0.8%:** Considere financiar equipamentos
-        """)
-    else:
-        st.markdown("""
-        - **Acima de 2%:** Exija entrada de 30%  
-        - **Abaixo de 1.5%:** Ofereça condições especiais
+    with abas[5]:
+        with st.expander("ℹ️ Projeção baseada no Relatório Focus"):
+            st.markdown("""
+        ### 📈 SELIC:
+        - 2025: 12,50%
+        - 2026: 10,50%
+        - 2027–2028: 10,00%
+
+        ### 💸 IPCA:
+        - Queda gradual até 3,80% em 2028
+
+        ### 📉 Inadimplência:
+        - Pode continuar alta. Risco de exclusão do Simples Nacional se não regularizar.
+
+        > 🧾 **Recomendação para MEI**: mantenha controle de fluxo de caixa e reavalie preços e formas de pagamento.
         """)
 
-st.caption("Fonte: Banco Central e IBGE | Dados atualizados em " + datetime.now().strftime("%d/%m/%Y"))
-
-
+elif pagina == "Contabilidade":
+    import streamlit_app
+    streamlit_app.app() 
