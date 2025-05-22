@@ -14,6 +14,12 @@ st.set_page_config(
     menu_items={}  # Desativa o menu automático
 )
 
+st.logo(
+    'assets/HELPMEI.png',
+    size="large",
+    icon_image='assets/logo.png',
+)
+
 # Cores dos indicadores
 CORES = {
     "SELIC": "#2980B9",

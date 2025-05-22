@@ -11,6 +11,12 @@ st.set_page_config(
     menu_items={}
 )
 
+st.logo(
+    'assets/HELPMEI.png',
+    size="large",
+    icon_image='assets/logo.png',
+)
+
 # Função para criar sidebar personalizado
 
 with st.sidebar:

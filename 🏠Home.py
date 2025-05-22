@@ -14,6 +14,7 @@ st.set_page_config(
 
 st.logo(
     'assets/HELPMEI.png',
+    size="large",
     icon_image='assets/logo.png',
 )
 
@@ -65,7 +66,7 @@ particles_background = """
 particlesJS("particles-js", {
     "particles": {
         "number": {
-            "value": 80,
+            "value": 150,
             "density": {
                 "enable": true,
                 "value_area": 800
