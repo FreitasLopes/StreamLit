@@ -179,7 +179,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Team header with enhanced styling
-st.markdown('<div class="team-header">EQUIPE AJUDA MEI SP</div>', unsafe_allow_html=True)
+st.markdown('<div class="team-header">EQUIPE HELP MEI SP</div>', unsafe_allow_html=True)
 st.markdown('<div class="team-name">Os café com Leite</div>', unsafe_allow_html=True)
 st.markdown('<div class="team-description">Grupo de desenvolvimento dedicado a criar soluções para microempreendedores</div>', unsafe_allow_html=True)
 

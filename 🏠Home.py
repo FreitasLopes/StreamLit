@@ -8,8 +8,13 @@ import os
 st.set_page_config(
     page_title="Help MEi",
     layout="centered",
-    page_icon="logo.png",
+    page_icon="assets/logo.png",
     menu_items={}
+)
+
+st.logo(
+    'assets/HELPMEI.png',
+    icon_image='assets/logo.png',
 )
 
 # Função para criar sidebar personalizado
@@ -127,19 +132,41 @@ st.markdown("""
 
 Seja bem-vindo ao **Painel MEI** — uma plataforma interativa criada para ajudar **microempreendedores** a tomarem decisões mais **informadas, seguras e estratégicas** no dia a dia.
 
-Você não está sozinho: muitos MEIs enfrentam desafios na gestão financeira por falta de organização contábil e dificuldade em acessar dados econômicos de forma clara. As informações até existem, mas estão espalhadas e são complexas de interpretar.
+Nós temos a solução: muitos MEIs enfrentam desafios na gestão financeira por falta de organização contábil e dificuldade em acessar dados econômicos de forma clara. As informações até existem, mas estão espalhadas e são complexas de interpretar.
 
 É por isso que criamos o **Help MEI**: uma solução prática, visual e poderosa — feita sob medida para o seu negócio.
 
 ---
+</div>
+""", unsafe_allow_html=True)
 
-### 💼 Aqui, você encontra:
+st.title("💼 Aqui, você encontra:")
+col1, col2, col3, col4 = st.columns(4)
 
-✅ **Indicadores Econômicos Atualizados**  
-✅ **Calculadora Contábil Inteligente**  
-✅ **Visual Dinâmico e Intuitivo**  
-✅ **Análises que fazem sentido para o seu dia a dia**  
+with col1:
+    st.image("assets/bar_chart_financial_graph_graphic_icon (2).png", width=80)
+    st.markdown("**Indicadores Econômicos Atualizados**")
 
+with col2:
+    st.image("assets/calculator_business_finance_office_marketing_icon.png", width=80)
+    st.markdown("**Calculadora Contábil Inteligente**")
+
+with col3:
+    st.image("assets/app_browser_essential_object_ui_icon.png", width=80)
+    st.markdown("**Visual Dinâmico e Intuitivo**")
+
+with col4:
+    st.image("assets/progress_growth_graph_analysis_success_icon.png", width=80)
+    st.markdown("**Análises que fazem sentido para o seu dia a dia**")
+
+
+ 
+
+
+
+
+
+st.markdown("""
 ---
 
 ### 🚀 Comece agora mesmo!

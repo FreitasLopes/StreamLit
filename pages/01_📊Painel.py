@@ -268,15 +268,14 @@ with abas[2]:
     st.plotly_chart(fig, use_container_width=True)
 
     correlacao = df[x_axis].corr(df[y_axis])
-    abs_corr = abs(correlacao)
     nivel = (
-        "forte" if abs_corr >= 0.7 else
-        "moderada" if abs_corr >= 0.4 else
-        "fraca" if abs_corr >= 0.2 else
+        "forte" if correlacao > 0.7 else
+        "moderada" if correlacao > 0.4 else
+        "fraca" if correlacao > 0.2 else
         "muito fraca"
     )
     direcao = "direta" if correlacao > 0 else "inversa"
-    st.info(f"📌 Correlação: **{nivel}** e **{direcao}** ({abs_corr:.2f})")
+    st.info(f"📌 Correlação: **{nivel}** e **{direcao}** ({correlacao:.2f})")
 
 with abas[3]:
     with st.expander("ℹ️ Sobre este gráfico"):
